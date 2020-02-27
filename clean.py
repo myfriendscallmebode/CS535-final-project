@@ -7,6 +7,7 @@ import pickle
 df = pd.read_csv("tweet-data.csv", encoding='latin1')
 tweets = df['text'].tolist()
 gender = df['gender'].tolist()
+gender = [0 if g == 'male' else 1 if g == 'female' else 2 for g in gender]
 
 def clean(tweet):
 	tweet = ' '.join(re.sub("(\w+:\/\/\S+)", " ", tweet).split()) #url
@@ -24,12 +25,9 @@ def clean(tweet):
 
 tweets, hashtags = map(list, zip(*[clean(t) for t in tweets]))
 
-data_dict = {}
-
-for i in range(len(tweets)):
-	data_dict[i] = {'text': tweets[i],
-			   'hashtags': hashtags[i],
-			   'gender': gender[i]}
+data_dict = {'text': tweets,
+			   'hashtags': hashtags,
+			   'gender': gender}
 
 
 with open('data-dict.pickle', 'wb') as handle:
