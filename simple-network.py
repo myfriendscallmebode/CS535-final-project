@@ -77,17 +77,17 @@ def eval_net(data, targets):
     for tweet, label in zip(data, targets):
     	hidden = net.initHidden()
     	tweet_in = tensorFromText(twitter_lang, tweet).cuda()
-    	target = torch.tensor(label).cuda()
+    	target = torch.tensor([label]).cuda()
     	hidden = net.initHidden()
     	net.zero_grad()
     	for i in range(tweet_in.size()[0]):
         	output, hidden = net(tweet_in[i], hidden)
     	_, predicted = torch.max(output.data, 1) #index of highest energy
     	total += 1
-    	print(predicted)
+    	print(predicted) #predicted not working
     	print(label)
     	correct += (predicted == label)
-    	loss = criterion(outputs.view(1,3), labels)
+    	loss = criterion(output.view(1,3), target)
     	total_loss += loss.item()
     net.train() # Why would I do this?
     return total_loss / total, correct.float() / total
@@ -122,7 +122,7 @@ if __name__ == '__main__':
 	criterion = nn.CrossEntropyLoss()
 	optimizer = optim.SGD(net.parameters(), lr=0.001)
 
-	index_subset = np.random.choice(len(text), size = 3000)
+	index_subset = np.random.choice(len(text), size = 500)
 	text_subset = [text[i] for i in index_subset]
 	label_subset = [labels[i] for i in index_subset]
 	print("training on tweets...")
