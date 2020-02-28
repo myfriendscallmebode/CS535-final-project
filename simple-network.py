@@ -82,11 +82,11 @@ def eval_net(data, targets):
     	net.zero_grad()
     	for i in range(tweet_in.size()[0]):
         	output, hidden = net(tweet_in[i], hidden)
-    	_, predicted = torch.max(output.data, 1) #index of highest energy
+    	values, predicted = torch.max(output.squeeze(), 0) #index of highest energy
     	total += 1
-    	print(predicted) #predicted not working
-    	print(label)
-    	correct += (predicted == label)
+    	#print(predicted) #predicted not working
+    	#print(target.squeeze())
+    	correct += (predicted == target)
     	loss = criterion(output.view(1,3), target)
     	total_loss += loss.item()
     net.train() # Why would I do this?
@@ -118,11 +118,11 @@ if __name__ == '__main__':
 		twitter_lang.addTweet(tweet)
 
 	#training
-	net = Net(input_size = twitter_lang.n_words, hidden_size = 30).cuda()
+	net = Net(input_size = twitter_lang.n_words, hidden_size = 100).cuda()
 	criterion = nn.CrossEntropyLoss()
 	optimizer = optim.SGD(net.parameters(), lr=0.001)
 
-	index_subset = np.random.choice(len(text), size = 500)
+	index_subset = np.random.choice(len(text), size = 3000)
 	text_subset = [text[i] for i in index_subset]
 	label_subset = [labels[i] for i in index_subset]
 	print("training on tweets...")
@@ -138,7 +138,7 @@ if __name__ == '__main__':
 			iters += 1
 
 		print('    Finish training this EPOCH, start evaluating...')
-		train_loss, train_acc = eval_net(text, labels)
+		train_loss, train_acc = eval_net(text_subset, label_subset)
 		print('EPOCH: %d train_loss: %.5f train_acc: %.5f' %
               (epoch+1, train_loss, train_acc))
 	    #print('EPOCH: %d train_loss: %.5f train_acc: %.5f test_loss: %.5f test_acc %.5f' %
