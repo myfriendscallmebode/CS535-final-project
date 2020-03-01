@@ -44,8 +44,6 @@ def tensorFromText(lang, sentence):
     indexes = indexesFromSentence(lang, sentence)
     return torch.tensor(indexes, dtype=torch.long, device=device).view(-1, 1)
 
-
-
 class Net(nn.Module):
     def __init__(self, input_size, hidden_size):
         super(Net, self).__init__()
@@ -72,24 +70,19 @@ def eval_net(data, targets):
     correct = 0
     total = 0
     total_loss = 0
-    net.eval() # Why would I do this?
+    net.eval() 
     criterion = nn.CrossEntropyLoss(reduction='mean')
     for tweet, label in zip(data, targets):
     	hidden = net.initHidden()
-    	tweet_in = tensorFromText(twitter_lang, tweet).cuda()
-    	target = torch.tensor([label]).cuda()
-    	hidden = net.initHidden()
     	net.zero_grad()
-    	for i in range(tweet_in.size()[0]):
-        	output, hidden = net(tweet_in[i], hidden)
+    	for i in range(tweet.size()[0]):
+        	output, hidden = net(tweet[i], hidden)
     	values, predicted = torch.max(output.squeeze(), 0) #index of highest energy
     	total += 1
-    	#print(predicted) #predicted not working
-    	#print(target.squeeze())
-    	correct += (predicted == target)
-    	loss = criterion(output.view(1,3), target)
+    	correct += (predicted == label)
+    	loss = criterion(output.view(1,3), label)
     	total_loss += loss.item()
-    net.train() # Why would I do this?
+    net.train()
     return total_loss / total, correct.float() / total
 
 def train(tweet, label):
@@ -120,30 +113,44 @@ if __name__ == '__main__':
 	#training
 	net = Net(input_size = twitter_lang.n_words, hidden_size = 100).cuda()
 	criterion = nn.CrossEntropyLoss()
-	optimizer = optim.SGD(net.parameters(), lr=0.001)
+	optimizer = optim.Adam(net.parameters())
 
-	index_subset = np.random.choice(len(text), size = 3000)
-	text_subset = [text[i] for i in index_subset]
-	label_subset = [labels[i] for i in index_subset]
+	#If you don't want to train it all
+	index_train = np.random.choice(len(text), size =  15000)
+	index_test = [i for i in range(len(text)) if i not in index_train]
+	text_train = [text[i] for i in index_train]
+	labels_train = [labels[i] for i in index_train]
+	text_test = [text[i] for i in index_test]
+	labels_test = [labels[i] for i in index_test]
+
+	text_train = [tensorFromText(twitter_lang, tweet).cuda() for tweet in text_train]
+	text_test = [tensorFromText(twitter_lang, tweet).cuda() for tweet in text_test]
+
+	labels_train = [torch.tensor([label]).cuda() for label in labels_train]
+	labels_test = [torch.tensor([label]).cuda() for label in labels_test]
+
+	
+	#pretrained_dict = torch.load("mytraining.pth") 
+	net.train()
+	#model_dict = net.state_dict(pretrained_dict) 
+
 	print("training on tweets...")
-	for epoch in range(10): 
+	for epoch in range(5): 
 		iters = 1
-		for tweet, label in zip(text_subset, label_subset):
-			if iters%500 == 0:
+		for tweet, target in zip(text_train, labels_train):
+			if iters%1000 == 0:
 				print("iteration:  " + str(iters))
 			net.zero_grad()
-			tweet_in = tensorFromText(twitter_lang, tweet).cuda()
-			target = torch.tensor([label]).cuda()
-			output, loss = train(tweet_in, target)
+			output, loss = train(tweet, target)
 			iters += 1
 
 		print('    Finish training this EPOCH, start evaluating...')
-		train_loss, train_acc = eval_net(text_subset, label_subset)
-		print('EPOCH: %d train_loss: %.5f train_acc: %.5f' %
-              (epoch+1, train_loss, train_acc))
-	    #print('EPOCH: %d train_loss: %.5f train_acc: %.5f test_loss: %.5f test_acc %.5f' %
-        #      (epoch+1, train_loss, train_acc, test_loss, test_acc))
-
+		train_loss, train_acc = eval_net(text_train, labels_train)
+		test_loss, test_acc = eval_net(text_test, labels_test)
+		print('EPOCH: %d train_loss: %.5f train_acc: %.5f test_loss: %.5f test_acc %.5f' %
+              (epoch+1, train_loss, train_acc, test_loss, test_acc))
+	torch.save(net.state_dict(), 'mytraining.pth')
+	    #
 
 
 
