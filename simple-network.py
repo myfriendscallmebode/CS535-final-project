@@ -57,9 +57,11 @@ class Net(nn.Module):
         self.embedding_size = embedding_size
         self.embedding = nn.Embedding(input_size, embedding_size, padding_idx) #learns embedding, input size is n_words, maybe experiment with different representation
         self.gru = nn.GRU(input_size = embedding_size, 
-        					hidden_size = hidden_size)
-        self.fc1 = nn.Linear(hidden_size + 1, 50) #for more parameters, why not?
-        self.fc2 = nn.Linear(50, 3)
+        					hidden_size = hidden_size,
+        					num_layers=1) #trying different nuymber of layers
+        self.fc1 = nn.Linear(hidden_size + 1, 20) #try different number of hidden units?
+        self.fc2 = nn.Linear(20, 3)
+        self.leakyrelu = nn.LeakyReLU()
 
     #forward pass
     def forward(self, batch, tag, hidden):
@@ -67,17 +69,17 @@ class Net(nn.Module):
     	output = embed
     	output, hidden = self.gru(output, hidden) #GRU layer
     	output = torch.cat((output.squeeze(), tag), dim = 1) #concatinate hashtag count
-    	output = self.fc1(output) #one fully connected layer
+    	output = self.leakyrelu(self.fc1(output)) #one fully connected layer
     	output = self.fc2(output) #second FC layer
     	return output, hidden
 
     #initializes the hidden state for a new tensor input
     #maybe we can learn initial states?
     def init_hidden(self, batch_size):
-        return torch.zeros(1, batch_size, self.hidden_size, device=device)
+        return torch.zeros(1, batch_size, self.hidden_size, device=device) #change first dimension for number of hidden layers of gru
 
 #evaluates the network, similar to assignment 3
-#takes a while since it goes through every tweet
+#
 def eval_batch(batch_tweets, batch_tag, batch_label):
     net.eval() 
     criterion = nn.CrossEntropyLoss(reduction='mean')
@@ -110,8 +112,8 @@ def train(batch_tweets, batch_tag, batch_label):
 
 if __name__ == '__main__':
 	device = "cuda" #make sure on GPU
-	BATCH_SIZE = 50
-	NUM_EPOCHS = 10
+	BATCH_SIZE = 250
+	NUM_EPOCHS = 50
 
 	#Open data dictionary, made with clean.py
 	with open('data-dict.pickle', 'rb') as handle:
@@ -199,9 +201,6 @@ if __name__ == '__main__':
 		test_loss = total_loss / total
 		test_acc = correct / total
 
-		print('    Finish training this EPOCH, start evaluating...')
-		#train_loss, train_acc = eval_net(tweets_train, hashtags_train, labels_train)
-		#test_loss, test_acc = eval_net(text_test, hashtags_test, labels_test)
 		print('EPOCH: %d train_loss: %.5f train_acc: %.5f test_loss: %.5f test_acc %.5f' %
               (epoch+1, train_loss, train_acc, test_loss, test_acc))
 	torch.save(net.state_dict(), 'mytraining.pth') #save state dictionary
