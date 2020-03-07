@@ -5,6 +5,7 @@ import re
 import pickle
 
 df = pd.read_csv("tweet-data.csv", encoding='latin1')
+df = df[df['gender'].isin(['male','female','brand'])]
 tweets = df['text'].tolist()
 gender = df['gender'].tolist()
 gender = [0 if g == 'male' else 1 if g == 'female' else 2 for g in gender]
@@ -37,7 +38,7 @@ tweets, hashtags = map(list, zip(*[clean(t) for t in tweets]))
 tweets = pad(tweets)
 
 #split into train/test
-index_train = np.random.choice(len(tweets), size =  15000) #arbitrary split
+index_train = np.random.choice(len(tweets), size =  15000, replace = False) #arbitrary split
 index_test = [i for i in range(len(tweets)) if i not in index_train]
 tweets_train = [tweets[i] for i in index_train]
 labels_train = [gender[i] for i in index_train]
