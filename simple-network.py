@@ -60,7 +60,7 @@ class Net(nn.Module):
         					hidden_size = hidden_size,
         					num_layers=1) #trying different nuymber of layers
         self.fc1 = nn.Linear(hidden_size + 1, 20) #try different number of hidden units?
-        self.fc2 = nn.Linear(20, 3)
+        self.fc2 = nn.Linear(20, 2)
         self.leakyrelu = nn.LeakyReLU()
 
     #forward pass
@@ -126,12 +126,15 @@ if __name__ == '__main__':
 	tweets_test = data_dict['tweets_test']
 	hashtags_test = data_dict['hashtags_test']
 	labels_test = data_dict['labels_test']
+	tweets_brand = data_dict['tweets_brand']
 
 	#initialize language, adds each tweet to the language
 	twitter_lang = Lang()
 	for tweet in tweets_train: #make language from all tweets
 		twitter_lang.add_tweet(tweet)
 	for tweet in tweets_test:
+		twitter_lang.add_tweet(tweet)
+	for tweet in tweets_brand:
 		twitter_lang.add_tweet(tweet)
 
 	pad_index = twitter_lang.word2index['<pad>']
@@ -155,7 +158,9 @@ if __name__ == '__main__':
 	hashtags_test = torch.stack([torch.tensor([len(hashtag)]).cuda().float() for hashtag in hashtags_test], 0)
 
 	#if you want to pretrain
-	#pretrained_dict = torch.load("mytraining.pth") 
+	#pretrained_dict = torch.load("mytraining.pth")
+	#for key in pretrained_dict:
+	#	print(key)
 	net.train()
 	#model_dict = net.state_dict(pretrained_dict) 
 
@@ -165,7 +170,7 @@ if __name__ == '__main__':
 		permutation = torch.randperm(tweets_train.size()[0]) #shuffle batches
 		iters = 1
 
-		for i in range(0,tweets_train.size()[0], BATCH_SIZE):
+		for i in range(0,tweets_train.size()[0] - tweets_train.size()[0]%BATCH_SIZE, BATCH_SIZE):
 			optimizer.zero_grad()
 			indices = permutation[i:i+BATCH_SIZE] #random batches
 			batch_tweets, batch_hashtags, batch_labels = tweets_train[indices], hashtags_train[indices], labels_train[indices]
@@ -175,7 +180,7 @@ if __name__ == '__main__':
 		correct = 0
 		total = 0
 		total_loss = 0
-		for i in range(0,tweets_test.size()[0], BATCH_SIZE):
+		for i in range(0,tweets_train.size()[0] - tweets_train.size()[0]%BATCH_SIZE, BATCH_SIZE):
 			indices = permutation[i:i+BATCH_SIZE] #random batches
 			batch_tweets, batch_hashtags, batch_labels = tweets_train[indices], hashtags_train[indices], labels_train[indices]
 			loss, num_correct = eval_batch(batch_tweets, batch_hashtags, batch_labels)
@@ -201,6 +206,6 @@ if __name__ == '__main__':
 		test_loss = total_loss / total
 		test_acc = correct / total
 
-		print('EPOCH: %d train_loss: %.5f train_acc: %.5f test_loss: %.5f test_acc %.5f' %
+		print('EPOCH: %d train_loss: %.5f train_acc: %.5f test_loss: %.5f test_acc: %.5f' %
               (epoch+1, train_loss, train_acc, test_loss, test_acc))
 	torch.save(net.state_dict(), 'mytraining.pth') #save state dictionary
