@@ -40,12 +40,33 @@ tweets = pad(tweets)
 #split into train/test
 index_train = np.random.choice(len(tweets), size =  15000, replace = False) #arbitrary split
 index_test = [i for i in range(len(tweets)) if i not in index_train]
-tweets_train = [tweets[i] for i in index_train]
-labels_train = [gender[i] for i in index_train]
-tweets_test = [tweets[i] for i in index_test]
-labels_test = [gender[i] for i in index_test]
-hashtags_train = [hashtags[i] for i in index_train]
-hashtags_test = [hashtags[i] for i in index_test]
+index_brand = [i for i in range(len(tweets)) if gender[i] == 2]
+# remove brands from train set
+index = []
+for i in index_train:
+	if gender[i] != 2:
+		index.append(i)
+tweets_train = [tweets[i] for i in index]
+labels_train = [gender[i] for i in index]
+hashtags_train = [hashtags[i] for i in index]
+print("train size")
+print(len(index))
+# male-female test set
+index = []
+for i in index_test:
+	if gender[i] != 2:
+		index.append(i)
+tweets_test = [tweets[i] for i in index]
+labels_test = [gender[i] for i in index]
+hashtags_test = [hashtags[i] for i in index]
+print("test size")
+print(len(index))
+# brand test set
+tweets_brand = [tweets[i] for i in index_brand]
+labels_brand = [gender[i] for i in index_brand]
+hashtags_brand = [hashtags[i] for i in index_brand]
+print("brand size")
+print(len(index_brand))
 
 
 
@@ -56,7 +77,10 @@ data_dict = {'tweets_train': tweets_train,
 			   'labels_train': labels_train,
 			   'tweets_test': tweets_test,
 			   'hashtags_test': hashtags_test,
-			   'labels_test': labels_test}
+			   'labels_test': labels_test,
+			   'tweets_brand': tweets_brand,
+			   'hashtags_brand': hashtags_brand,
+			   'labels_brand': labels_brand}
 
 
 with open('data-dict.pickle', 'wb') as handle:
