@@ -64,7 +64,7 @@ class Net(nn.Module):
         					hidden_size = hidden_size,
         					num_layers=1) #trying different nuymber of layers
         self.fc1 = nn.Linear(hidden_size + 1, 20) #try different number of hidden units?
-        self.fc2 = nn.Linear(20, 3)
+        self.fc2 = nn.Linear(20, 2)
         self.leakyrelu = nn.LeakyReLU()
 
     #forward pass
@@ -183,23 +183,29 @@ def guide(batch, tag, hidden, label):
 	return lifted_module()
 
 def predict(num_samples, batch, tag):
+	softmax = nn.Softmax(dim=1)
 	net.eval()
 	hidden = net.init_hidden(BATCH_SIZE)
 	sampled_models = [guide(None, None, None, None) for _ in range(num_samples)]
-	yhats = []
+	probs = []
 	for model in sampled_models:
 	    for j in range(batch.size()[1]): 
 	    	output, hidden = model(batch[:,j], tag, hidden)
-	    yhats.append(output.data)
-	mean = torch.mean(torch.stack(yhats), 0).cpu()
+	    probs.append(softmax(output.data))
+	mean = torch.mean(torch.stack(probs), 0).cpu()
+	var = torch.var(torch.stack(probs), 0).cpu()
+	preds = np.argmax(mean.numpy(), axis=1)
+	for i in range(BATCH_SIZE):
+		if var[i][preds[i]] > .23: # change threshold
+			preds[i] = 99
 	net.train()
-	return np.argmax(mean.numpy(), axis=1) 
+	return preds 
 
 
 if __name__ == '__main__':
 	device = "cuda" #make sure on GPU
 	BATCH_SIZE = 250
-	NUM_EPOCHS = 10
+	NUM_EPOCHS = 10 # change number of epochs
 
 	#Open data dictionary, made with clean.py
 	with open('data-dict.pickle', 'rb') as handle:
@@ -212,12 +218,17 @@ if __name__ == '__main__':
 	tweets_test = data_dict['tweets_test']
 	hashtags_test = data_dict['hashtags_test']
 	labels_test = data_dict['labels_test']
+	tweets_brand = data_dict['tweets_brand']
+	hashtags_brand = data_dict['hashtags_brand']
+	labels_brand = data_dict['labels_brand']
 
 	#initialize language, adds each tweet to the language
 	twitter_lang = Lang()
 	for tweet in tweets_train: #make language from all tweets
 		twitter_lang.add_tweet(tweet)
 	for tweet in tweets_test:
+		twitter_lang.add_tweet(tweet)
+	for tweet in tweets_brand:
 		twitter_lang.add_tweet(tweet)
 
 	pad_index = twitter_lang.word2index['<pad>']
@@ -233,12 +244,15 @@ if __name__ == '__main__':
 	#lists of tensors basically
 	tweets_train = torch.stack([tensor_from_text(twitter_lang, tweet).cuda() for tweet in tweets_train], 0)
 	tweets_test = torch.stack([tensor_from_text(twitter_lang, tweet).cuda() for tweet in tweets_test], 0)
+	tweets_brand = torch.stack([tensor_from_text(twitter_lang, tweet).cuda() for tweet in tweets_brand], 0)
 
 	labels_train = torch.stack([torch.tensor([label]).cuda() for label in labels_train], 0)
 	labels_test = torch.stack([torch.tensor([label]).cuda() for label in labels_test], 0)
+	labels_brand = torch.stack([torch.tensor([label]).cuda() for label in labels_brand], 0)
 
 	hashtags_train = torch.stack([torch.tensor([len(hashtag)]).cuda().float() for hashtag in hashtags_train], 0) #just using number of hashtags used in tweet
 	hashtags_test = torch.stack([torch.tensor([len(hashtag)]).cuda().float() for hashtag in hashtags_test], 0)
+	hashtags_brand = torch.stack([torch.tensor([len(hashtag)]).cuda().float() for hashtag in hashtags_brand], 0)
 
 	#if you want to pretrain
 	pretrained_dict = torch.load("mytraining.pth") 
@@ -246,6 +260,7 @@ if __name__ == '__main__':
 
 	#model_dict = net.state_dict(pretrained_dict)
 
+	# stochastic variational inference
 	svi = SVI(model, guide, optimizer, loss=Trace_ELBO())
 
 	#now we're training
@@ -254,7 +269,7 @@ if __name__ == '__main__':
 		permutation = torch.randperm(tweets_train.size()[0]) #shuffle batches
 		iters = 1
 
-		for i in range(0,tweets_train.size()[0], BATCH_SIZE):
+		for i in range(0,tweets_train.size()[0] - tweets_train.size()[0]%BATCH_SIZE, BATCH_SIZE):
 			indices = permutation[i:i+BATCH_SIZE] #random batches
 			batch_tweets, batch_hashtags, batch_labels = tweets_train[indices], hashtags_train[indices], labels_train[indices]
 			hidden = net.init_hidden(BATCH_SIZE)
@@ -265,27 +280,51 @@ if __name__ == '__main__':
 		#eval training data
 		correct = 0
 		total = 0
-		for i in range(0,tweets_train.size()[0], BATCH_SIZE):
+		fail = 0
+		for i in range(0,tweets_train.size()[0] - tweets_train.size()[0]%BATCH_SIZE, BATCH_SIZE):
 			indices = permutation[i:i+BATCH_SIZE] #random batches
 			batch_tweets, batch_hashtags, batch_labels = tweets_train[indices], hashtags_train[indices], labels_train[indices]
-			predicted = predict(10, batch_tweets, batch_hashtags)
-			num_correct = np.sum(predicted == batch_labels.cpu().numpy())
+			predicted = predict(25, batch_tweets, batch_hashtags) # change number of samples
+			num_correct = np.sum(predicted == batch_labels.squeeze().data.cpu().numpy())
+			num_fail = np.sum(predicted == 99)
 			total += batch_labels.size(0)
 			correct += num_correct
+			fail += num_fail
 		train_acc = correct / total
+		train_fail = fail / total
 
 
 		#eval test data
 		correct = 0
 		total = 0
+		fail = 0
 		for i in range(0,tweets_test.size()[0] - tweets_test.size()[0]%BATCH_SIZE, BATCH_SIZE):
 			batch_tweets, batch_hashtags, batch_labels = tweets_test[i:i+BATCH_SIZE], hashtags_test[i:i+BATCH_SIZE], labels_test[i:i+BATCH_SIZE]
-			predicted = predict(10, batch_tweets, batch_hashtags)
-			num_correct = np.sum(predicted == batch_labels.cpu().numpy())
+			predicted = predict(25, batch_tweets, batch_hashtags) # change number of samples
+			num_correct = np.sum(predicted == batch_labels.squeeze().data.cpu().numpy())
 			total += batch_labels.size(0)
 			correct += num_correct
+			num_fail = np.sum(predicted == 99)
+			fail += num_fail
 		test_acc = correct / total
+		test_fail = fail / total
 
-		print('EPOCH: %d train_acc: %.5f test_acc: %.5f' %
-              (epoch+1, train_acc, test_acc))
+		total = 0
+		fail = 0
+		for i in range(0,tweets_brand.size()[0] - tweets_brand.size()[0]%BATCH_SIZE, BATCH_SIZE):
+			batch_tweets, batch_hashtags, batch_labels = tweets_brand[i:i+BATCH_SIZE], hashtags_brand[i:i+BATCH_SIZE], labels_brand[i:i+BATCH_SIZE]
+			predicted = predict(25, batch_tweets, batch_hashtags) # change number of samples
+			total += batch_labels.size(0)
+			num_fail = np.sum(predicted == 99)
+			fail += num_fail
+		brand_fail = fail / total
+
+		print('EPOCH: %d' %
+              (epoch+1))
+		print('train_acc: %.5f prop_fail: %.5f' %
+			  (train_acc, train_fail))
+		print('test_acc: %.5f prop_fail: %.5f' %
+			  (test_acc, test_fail))
+		print('brand prop_fail: %.5f' %
+			  (brand_fail))
 	#torch.save(net.state_dict(), 'mytraining.pth') #save state dictionary
