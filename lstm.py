@@ -172,6 +172,9 @@ if __name__ == '__main__':
     net.train()
     #model_dict = net.state_dict(pretrained_dict) 
 
+    acc_matrix = np.zeros((NUM_EPOCHS, 2))
+    loss_matrix = np.zeros((NUM_EPOCHS, 2))
+
     #now we're training
     print("training on tweets...")
     for epoch in range(NUM_EPOCHS): 
@@ -197,8 +200,8 @@ if __name__ == '__main__':
             correct += num_correct
         train_loss = total_loss / total
         train_acc = correct / total
-
-
+        acc_matrix[epoch, 0] = train_acc
+        loss_matrix[epoch, 0] = train_loss
 
         #eval test data
         correct = 0
@@ -213,8 +216,12 @@ if __name__ == '__main__':
             correct += num_correct
         test_loss = total_loss / total
         test_acc = correct / total
+        acc_matrix[epoch, 1] = test_acc
+        loss_matrix[epoch, 1] = test_loss
 
         print('EPOCH: %d train_loss: %.5f train_acc: %.5f test_loss: %.5f test_acc %.5f' %
               (epoch+1, train_loss, train_acc, test_loss, test_acc))
     torch.save(net.state_dict(), 'lstm.pth') #save state dictionary
+    np.savetxt("lstm_acc.csv", acc_matrix, delimiter=",")
+    np.savetxt("lstm_loss.csv", loss_matrix, delimiter=",")
 
