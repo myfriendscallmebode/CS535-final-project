@@ -73,6 +73,7 @@ class Net(nn.Module):
     	#print("batch size",batch.size())
     	embed = self.embedding(batch).view(1, BATCH_SIZE, -1) #embedding of vector
     	output = embed
+    	self.lstm.flatten_parameters()
     	#print("output size",output.size())
     	#print("hidden size",hidden.size())
     	output, hidden = self.lstm(output, hidden) #GRU layer
@@ -232,9 +233,12 @@ def predict(num_samples, batch, tag):
 	    probs.append(softmax(output.data))
 	mean = torch.mean(torch.stack(probs), 0).cpu()
 	var = torch.var(torch.stack(probs), 0).cpu()
+	#lower = torch.kthvalue(torch.stack(probs), 2, 0).values.cpu()
+	#upper = torch.kthvalue(torch.stack(probs), 24, 0).values.cpu()
 	preds = np.argmax(mean.numpy(), axis=1)
 	for i in range(BATCH_SIZE):
-		if var[i][preds[i]] > .25:
+		if var[i][preds[i]] > .2:
+		#if lower[i][preds[i]] < .5 and upper[i][preds[i]] > .5:
 			preds[i] = 99
 	net.train()
 	return preds 
@@ -243,7 +247,7 @@ def predict(num_samples, batch, tag):
 if __name__ == '__main__':
 	device = "cuda" #make sure on GPU
 	BATCH_SIZE = 250
-	NUM_EPOCHS = 10
+	NUM_EPOCHS = 50
 
 	#Open data dictionary, made with clean.py
 	with open('data-dict.pickle', 'rb') as handle:
@@ -301,6 +305,9 @@ if __name__ == '__main__':
 	# stochastic variational inference
 	svi = SVI(model, guide, optimizer, loss=Trace_ELBO())
 
+	acc_matrix = np.zeros((NUM_EPOCHS, 2))
+	fail_matrix = np.zeros((NUM_EPOCHS, 3))
+
 	#now we're training
 	print("training on tweets...")
 	for epoch in range(NUM_EPOCHS): 
@@ -325,11 +332,13 @@ if __name__ == '__main__':
 			predicted = predict(25, batch_tweets, batch_hashtags)
 			num_correct = np.sum(predicted == batch_labels.squeeze().data.cpu().numpy())
 			num_fail = np.sum(predicted == 99)
-			total += batch_labels.size(0)
+			total += batch_labels.size(0) - num_fail
 			correct += num_correct
 			fail += num_fail
 		train_acc = correct / total
-		train_fail = fail / total
+		train_fail = fail / (tweets_train.size()[0] - tweets_train.size()[0]%BATCH_SIZE)
+		acc_matrix[epoch, 0] = train_acc
+		fail_matrix[epoch, 0] = train_fail
 
 
 		#eval test data
@@ -340,12 +349,14 @@ if __name__ == '__main__':
 			batch_tweets, batch_hashtags, batch_labels = tweets_test[i:i+BATCH_SIZE], hashtags_test[i:i+BATCH_SIZE], labels_test[i:i+BATCH_SIZE]
 			predicted = predict(25, batch_tweets, batch_hashtags)
 			num_correct = np.sum(predicted == batch_labels.squeeze().data.cpu().numpy())
-			total += batch_labels.size(0)
-			correct += num_correct
 			num_fail = np.sum(predicted == 99)
+			total += batch_labels.size(0) - num_fail
+			correct += num_correct
 			fail += num_fail
 		test_acc = correct / total
-		test_fail = fail / total
+		test_fail = fail / (tweets_test.size()[0] - tweets_test.size()[0]%BATCH_SIZE)
+		acc_matrix[epoch, 1] = test_acc
+		fail_matrix[epoch, 1] = test_fail
 
 		total = 0
 		fail = 0
@@ -356,6 +367,7 @@ if __name__ == '__main__':
 			num_fail = np.sum(predicted == 99)
 			fail += num_fail
 		brand_fail = fail / total
+		fail_matrix[epoch, 2] = brand_fail
 
 		print('EPOCH: %d' %
               (epoch+1))
@@ -366,3 +378,6 @@ if __name__ == '__main__':
 		print('brand prop_fail: %.5f' %
 			  (brand_fail))
 	#torch.save(net.state_dict(), 'mytraining.pth') #save state dictionary
+	np.savetxt("blstm_acc.csv", acc_matrix, delimiter=",")
+	np.savetxt("blstm_fail.csv", fail_matrix, delimiter=",")
+
