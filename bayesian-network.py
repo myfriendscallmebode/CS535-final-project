@@ -205,7 +205,7 @@ def predict(num_samples, batch, tag):
 if __name__ == '__main__':
 	device = "cuda" #make sure on GPU
 	BATCH_SIZE = 250
-	NUM_EPOCHS = 50 # change number of epochs
+	NUM_EPOCHS = 100 # change number of epochs
 
 	#Open data dictionary, made with clean.py
 	with open('data-dict.pickle', 'rb') as handle:
