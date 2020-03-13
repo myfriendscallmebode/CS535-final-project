@@ -69,13 +69,14 @@ class Net(nn.Module):
 
     #forward pass
     def forward(self, batch, tag, hidden):
-    	embed = self.embedding(batch).view(1, BATCH_SIZE, -1) #embedding of vector
-    	output = embed
-    	self.gru.flatten_parameters()
-    	output, hidden = self.gru(output, hidden) #GRU layer
-    	output = torch.cat((output.squeeze(), tag), dim = 1) #concatinate hashtag count
-    	output = self.leakyrelu(self.fc1(output)) #one fully connected layer
-    	output = self.fc2(output) #second FC layer
+    	for i in range(batch.size()[1]): #forward pass
+    		embed = self.embedding(batch[:,i]).view(1, BATCH_SIZE, -1) #embedding of vector
+    		output = embed
+    		self.gru.flatten_parameters()
+    		output, hidden = self.gru(output, hidden) #GRU layer
+    		output = torch.cat((output.squeeze(), tag), dim = 1) #concatinate hashtag count
+    		output = self.leakyrelu(self.fc1(output)) #one fully connected layer
+    		output = self.fc2(output) #second FC layer
     	return output, hidden
 
     #initializes the hidden state for a new tensor input
@@ -189,14 +190,15 @@ def predict(num_samples, batch, tag):
 	sampled_models = [guide(None, None, None, None) for _ in range(num_samples)]
 	probs = []
 	for model in sampled_models:
-	    for j in range(batch.size()[1]): 
-	    	output, hidden = model(batch[:,j], tag, hidden)
+	    #for j in range(batch.size()[1]): 
+	    	#output, hidden = model(batch[:,j], tag, hidden)
+	    output, hidden = model(batch, tag, hidden)
 	    probs.append(softmax(output.data))
 	mean = torch.mean(torch.stack(probs), 0).cpu()
 	var = torch.var(torch.stack(probs), 0).cpu()
 	preds = np.argmax(mean.numpy(), axis=1)
 	for i in range(BATCH_SIZE):
-		if var[i][preds[i]] > .2: # change threshold
+		if var[i][preds[i]] > .23: # change threshold
 			preds[i] = 99
 	net.train()
 	return preds 
@@ -205,7 +207,7 @@ def predict(num_samples, batch, tag):
 if __name__ == '__main__':
 	device = "cuda" #make sure on GPU
 	BATCH_SIZE = 250
-	NUM_EPOCHS = 100 # change number of epochs
+	NUM_EPOCHS = 50 # change number of epochs
 
 	#Open data dictionary, made with clean.py
 	with open('data-dict.pickle', 'rb') as handle:
@@ -276,8 +278,9 @@ if __name__ == '__main__':
 			indices = permutation[i:i+BATCH_SIZE] #random batches
 			batch_tweets, batch_hashtags, batch_labels = tweets_train[indices], hashtags_train[indices], labels_train[indices]
 			hidden = net.init_hidden(BATCH_SIZE)
-			for j in range(batch_tweets.size()[1]): 
-				loss = svi.step(batch_tweets[:,j], batch_hashtags, hidden, batch_labels)
+			#for j in range(batch_tweets.size()[1]): 
+				#loss = svi.step(batch_tweets[:,j], batch_hashtags, hidden, batch_labels)
+			loss = svi.step(batch_tweets, batch_hashtags, hidden, batch_labels)
 
 
 		#eval training data
