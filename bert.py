@@ -61,8 +61,8 @@ def train(batch_tweets, batch_tags, batch_labels):
 if __name__ == '__main__':
 	print(torch.cuda.memory_summary())
 	device = "cuda" #make sure on GPU
-	BATCH_SIZE = 250
-	NUM_EPOCHS = 50
+	BATCH_SIZE = 50
+	NUM_EPOCHS = 10
 
 	pretrained_weights = 'bert-base-uncased'
 	tokenizer = BertTokenizer.from_pretrained(pretrained_weights)
