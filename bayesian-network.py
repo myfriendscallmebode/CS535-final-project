@@ -207,7 +207,9 @@ def predict(num_samples, batch, tag):
 if __name__ == '__main__':
 	device = "cuda" #make sure on GPU
 	BATCH_SIZE = 250
-	NUM_EPOCHS = 50 # change number of epochs
+	NUM_EPOCHS = 20 # change number of epochs
+
+	writer = SummaryWriter(log_dir='./runs')
 
 	#Open data dictionary, made with clean.py
 	with open('data-dict.pickle', 'rb') as handle:
@@ -341,3 +343,9 @@ if __name__ == '__main__':
 	#torch.save(net.state_dict(), 'mytraining.pth') #save state dictionary
 	np.savetxt("bgru_acc.csv", acc_matrix, delimiter=",")
 	np.savetxt("bgru_fail.csv", fail_matrix, delimiter=",")
+
+	net.eval()
+	batch_tweets, batch_hashtags, batch_labels = tweets_train[0:BATCH_SIZE], hashtags_train[0:BATCH_SIZE], labels_train[0:BATCH_SIZE]
+	hidden = net.init_hidden(BATCH_SIZE)
+	writer.add_graph(net, input_to_model=(batch_tweets[:,0], batch_hashtags, hidden))
+	writer.close()

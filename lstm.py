@@ -121,7 +121,9 @@ def train(batch_tweets, batch_tag, batch_label):
 if __name__ == '__main__':
     device = "cuda" #make sure on GPU
     BATCH_SIZE = 250
-    NUM_EPOCHS = 50
+    NUM_EPOCHS = 20
+
+    writer = SummaryWriter(log_dir='./runs')
 
     #Open data dictionary, made with clean.py
     with open('data-dict.pickle', 'rb') as handle:
@@ -224,4 +226,10 @@ if __name__ == '__main__':
     torch.save(net.state_dict(), 'lstm.pth') #save state dictionary
     np.savetxt("lstm_acc.csv", acc_matrix, delimiter=",")
     np.savetxt("lstm_loss.csv", loss_matrix, delimiter=",")
+
+    net.eval()
+    batch_tweets, batch_hashtags, batch_labels = tweets_train[0:BATCH_SIZE], hashtags_train[0:BATCH_SIZE], labels_train[0:BATCH_SIZE]
+    hidden = net.init_hidden(BATCH_SIZE)
+    writer.add_graph(net, input_to_model=(batch_tweets[:,0], batch_hashtags, hidden))
+    writer.close()
 

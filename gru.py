@@ -60,7 +60,7 @@ class Net(nn.Module):
         					hidden_size = hidden_size,
         					num_layers=1) #trying different nuymber of layers
         self.fc1 = nn.Linear(hidden_size + 1, 20) #try different number of hidden units?
-        self.fc2 = nn.Linear(20, 3)
+        self.fc2 = nn.Linear(20, 2) #change to 2 labels
         self.leakyrelu = nn.LeakyReLU()
 
     #forward pass
@@ -108,12 +108,12 @@ def train(batch_tweets, batch_tag, batch_label):
     optimizer.step()
     return output, loss.item()
 
-
-
 if __name__ == '__main__':
 	device = "cuda" #make sure on GPU
-	BATCH_SIZE = 250
-	NUM_EPOCHS = 50
+	BATCH_SIZE = 100
+	NUM_EPOCHS = 20
+
+	writer = SummaryWriter(log_dir='./runs')
 
 	#Open data dictionary, made with clean.py
 	with open('data-dict.pickle', 'rb') as handle:
@@ -165,7 +165,7 @@ if __name__ == '__main__':
 		permutation = torch.randperm(tweets_train.size()[0]) #shuffle batches
 		iters = 1
 
-		for i in range(0,tweets_train.size()[0], BATCH_SIZE):
+		for i in range(0,tweets_train.size()[0] - tweets_train.size()[0]%BATCH_SIZE, BATCH_SIZE):
 			optimizer.zero_grad()
 			indices = permutation[i:i+BATCH_SIZE] #random batches
 			batch_tweets, batch_hashtags, batch_labels = tweets_train[indices], hashtags_train[indices], labels_train[indices]
@@ -175,7 +175,7 @@ if __name__ == '__main__':
 		correct = 0
 		total = 0
 		total_loss = 0
-		for i in range(0,tweets_test.size()[0], BATCH_SIZE):
+		for i in range(0,tweets_train.size()[0] - tweets_train.size()[0]%BATCH_SIZE, BATCH_SIZE):
 			indices = permutation[i:i+BATCH_SIZE] #random batches
 			batch_tweets, batch_hashtags, batch_labels = tweets_train[indices], hashtags_train[indices], labels_train[indices]
 			loss, num_correct = eval_batch(batch_tweets, batch_hashtags, batch_labels)
@@ -203,4 +203,9 @@ if __name__ == '__main__':
 
 		print('EPOCH: %d train_loss: %.5f train_acc: %.5f test_loss: %.5f test_acc %.5f' %
               (epoch+1, train_loss, train_acc, test_loss, test_acc))
-	torch.save(net.state_dict(), 'mytraining.pth') #save state dictionary
+	#torch.save(net.state_dict(), 'mytraining.pth') #save state dictionary
+	net.eval()
+	batch_tweets, batch_hashtags, batch_labels = tweets_train[0:BATCH_SIZE], hashtags_train[0:BATCH_SIZE], labels_train[0:BATCH_SIZE]
+	hidden = net.init_hidden(BATCH_SIZE)
+	writer.add_graph(net, input_to_model=(batch_tweets[:,0], batch_hashtags, hidden))
+	writer.close()

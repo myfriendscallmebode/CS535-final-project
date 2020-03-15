@@ -59,7 +59,7 @@ def train(batch_tweets, batch_tags, batch_labels):
 
 
 if __name__ == '__main__':
-	print(torch.cuda.memory_summary())
+	#print(torch.cuda.memory_summary())
 	device = "cuda" #make sure on GPU
 	BATCH_SIZE = 50
 	NUM_EPOCHS = 10
@@ -98,7 +98,7 @@ if __name__ == '__main__':
 	#model_dict = net.state_dict(pretrained_dict) 
 
 	#now we're training
-	print(torch.cuda.memory_summary())
+	#print(torch.cuda.memory_summary())
 	print("training on tweets...")
 	for epoch in range(NUM_EPOCHS): 
 		permutation = torch.randperm(tweets_train.size()[0]) #shuffle batches
